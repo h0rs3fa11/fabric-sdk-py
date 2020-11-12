@@ -25,7 +25,7 @@ from hfc.fabric.transaction.tx_proposal_request import TXProposalRequest, \
     CC_INVOKE, CC_QUERY, CC_UPGRADE
 from hfc.protos.common import common_pb2, configtx_pb2, ledger_pb2
 from hfc.protos.peer import query_pb2
-from hfc.protos.peer.chaincode_pb2 import ChaincodeData
+from hfc.protos.peer.chaincode_pb2 import ChaincodeData, CDSData
 from hfc.fabric.block_decoder import BlockDecoder, \
     decode_fabric_peers_info, decode_fabric_MSP_config, \
     decode_fabric_endpoints, decode_proposal_response_payload, \
@@ -769,6 +769,7 @@ class Client(object):
         :param requestor: User role who issue the request
         :param channel_name: name of channel to query
         :param orderer: Names or Instance of the orderer to query
+        :param decode: Decode the response payload
         :return: A ConfigEnveloppe
         """
         target_orderer = None
@@ -1375,6 +1376,9 @@ class Client(object):
         payload = res['extension']['response']['payload']
         ccd.ParseFromString(payload)
 
+        cdsData = CDSData()
+        cdsData.ParseFromString(ccd.data)
+
         policy = decode_signature_policy_envelope(
             ccd.policy.SerializeToString())
         instantiation_policy = decode_signature_policy_envelope(
@@ -1386,8 +1390,8 @@ class Client(object):
             'vscc': ccd.vscc,
             'policy': policy,
             'data': {
-                'hash': ccd.data.hash,
-                'metadatahash': ccd.data.metadatahash,
+                'hash': cdsData.hash,
+                'metadatahash': cdsData.metadatahash,
             },
             'id': ccd.id,
             'instantiation_policy': instantiation_policy,
@@ -1882,13 +1886,16 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
-                    query_trans = query_pb2.ChannelQueryResponse()
-                    query_trans.ParseFromString(v.response.payload)
-                    for ch in query_trans.channels:
-                        _logger.debug('channel id {}'.format(
-                            ch.channel_id))
-                    return query_trans
+                if v.response:
+                    if decode:
+                        query_trans = query_pb2.ChannelQueryResponse()
+                        query_trans.ParseFromString(v.response.payload)
+                        for ch in query_trans.channels:
+                            _logger.debug('channel id {}'.format(
+                                ch.channel_id))
+                        return query_trans
+                    else:
+                        return v.response.payload
                 r.append(v)
 
             except Exception:
@@ -1905,7 +1912,7 @@ class Client(object):
         :param requestor: User role who issue the request
         :param channel_name: Name of channel to query
         :param peers: List of  peer name and/or Peer to install
-        :param deocode: Decode the response payload
+        :param decode: Decode the response payload
         :return: A `BlockchainInfo` or `ProposalResponse`
         """
 
@@ -1936,12 +1943,16 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
-                    chain_info = ledger_pb2.BlockchainInfo()
-                    chain_info.ParseFromString(v.response.payload)
-                    _logger.debug('response status {}'.format(
-                        v.response.status))
-                    return chain_info
+                if v.response:
+                    if decode:
+                        chain_info = ledger_pb2.BlockchainInfo()
+                        chain_info.ParseFromString(v.response.payload)
+                        _logger.debug('response status {}'.format(
+                            v.response.status))
+                        return chain_info
+                    else:
+                        return v.response.payload
+
                 r.append(v)
 
             except Exception:
@@ -1960,7 +1971,7 @@ class Client(object):
         :param channel_name: Name of channel to query
         :param peers: List of  peer name and/or Peer to install
         :param tx_id: Transaction ID
-        :param deocode: Decode the response payload
+        :param decode: Decode the response payload
         :return: A `BlockDecoder` or `ProposalResponse`
         """
 
@@ -1992,13 +2003,16 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
+                if v.response:
                     _logger.debug(
                         'response status {}'.format(v.response.status))
-                    block = BlockDecoder().decode(v.response.payload)
-                    _logger.debug('looking at block {}'.format(
-                        block['header']['number']))
-                    return block
+                    if decode:
+                        block = BlockDecoder().decode(v.response.payload)
+                        _logger.debug('looking at block {}'.format(
+                            block['header']['number']))
+                        return block
+                    else:
+                        return v.response.payload
                 r.append(v)
 
             except Exception:
@@ -2017,7 +2031,7 @@ class Client(object):
         :param channel_name: Name of channel to query
         :param peers: List of  peer name and/or Peer to install
         :param block_hash: Hash of a block
-        :param deocode: Decode the response payload
+        :param decode: Decode the response payload
         :return: A `BlockDecoder` or `ProposalResponse`
         """
 
@@ -2049,13 +2063,16 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
+                if v.response:
                     _logger.debug('response status {}'.format(
                         v.response.status))
-                    block = BlockDecoder().decode(v.response.payload)
-                    _logger.debug('looking at block {}'.format(
-                        block['header']['number']))
-                    return block
+                    if decode:
+                        block = BlockDecoder().decode(v.response.payload)
+                        _logger.debug('looking at block {}'.format(
+                            block['header']['number']))
+                        return block
+                    else:
+                        return v.response.payload
                 r.append(v)
 
             except Exception:
@@ -2074,7 +2091,7 @@ class Client(object):
         :param channel_name: name of channel to query
         :param peers: List of  peer name and/or Peer to install
         :param block_number: Number of a block
-        :param deocode: Decode the response payload
+        :param decode: Decode the response payload
         :return: A `BlockDecoder` or `ProposalResponse`
         """
 
@@ -2106,13 +2123,16 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
+                if v.response:
                     _logger.debug('response status {}'.format(
                         v.response.status))
-                    block = BlockDecoder().decode(v.response.payload)
-                    _logger.debug('looking at block {}'.format(
-                        block['header']['number']))
-                    return block
+                    if decode:
+                        block = BlockDecoder().decode(v.response.payload)
+                        _logger.debug('looking at block {}'.format(
+                            block['header']['number']))
+                        return block
+                    else:
+                        return v.response.payload
                 r.append(v)
 
             except Exception:
@@ -2163,12 +2183,15 @@ class Client(object):
         r = []
         for v in res:
             try:
-                if v.response and decode:
+                if v.response:
                     _logger.debug('response status {}'.format(
                         v.response.status))
-                    process_trans = BlockDecoder().decode_transaction(
-                        v.response.payload)
-                    return process_trans
+                    if decode:
+                        process_trans = BlockDecoder().decode_transaction(
+                            v.response.payload)
+                        return process_trans
+                    else:
+                        return v.response.payload
 
                 r.append(v)
 
